@@ -1,0 +1,33 @@
+#! /usr/bin/env ruby
+
+begin
+
+require "vmstat"
+require 'socket'
+
+port = 2000
+
+
+server = TCPServer.new port # Server bound to port 2000
+hostname = Socket.gethostname
+
+puts "Mimic is running on TCP port: #{port}"
+puts "Press Control-C to exit"
+
+loop do
+  client = server.accept    # Wait for a client to connect
+  client.puts hostname 
+  client.puts Vmstat.boot_time 
+  client.puts Vmstat.cpu 
+  client.puts Vmstat.memory 
+  client.puts Vmstat.memory 
+  client.puts "Time is #{Time.now}"
+  client.close
+end
+
+puts "test"
+rescue Interrupt
+  puts "\nexiting..."
+rescue Exception => e
+puts e
+end
