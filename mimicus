@@ -1,17 +1,24 @@
 #! /usr/bin/env ruby
 
+conf="/etc/mimicus/mimicus.conf"
+
 begin
 
-require "vmstat"
+require 'vmstat'
+require 'yaml'
 require 'socket'
 
-port = 2000
+config = YAML.load_file(conf)
+
+port = config['port']
+
+#port = 2000
 
 
 server = TCPServer.new port # Server bound to port 2000
 hostname = Socket.gethostname
 
-puts "Mimic is running on TCP port: #{port}"
+puts "Mimicus agent is running on TCP port: #{port}"
 puts "Press Control-C to exit"
 
 loop do
