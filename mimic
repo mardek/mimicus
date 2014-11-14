@@ -1,0 +1,69 @@
+#! /usr/bin/env ruby
+# Load the first module
+require 'yaml'
+require 'process'
+
+# Default Mimic Configuration file path 
+conf="/etc/mimic/mimic.conf"
+pid="/var/tmp/mimic.pid"
+
+# The Mimic conf file repo URL
+conf_ex="https://github.com/mardek/mimicus/blob/master/conf"
+
+# Some basic conf check
+if File.exist?(conf)
+	config = YAML.load_file(conf)
+else
+	puts "Configuration file missing : #{conf}"
+	puts "Please fetch a config file examples at #{conf_ex}"
+exit
+end
+
+# Check if the PID file is still there
+if File.exist?(pid)
+puts "mimic agent is alredy running !!!"
+
+oldpidfile = File.open(pid, "r")
+oldpid = oldpidfile.read
+oldpidfile.close
+exit
+
+else
+File.write(pid, Process.pid) # Then write the new PID onto the pid file
+end
+
+
+# We start now !!
+begin
+
+# Load needed modules
+require 'vmstat' 
+require 'socket'
+
+# Grab the port number in the configuration file
+port = config['port']
+
+server = TCPServer.new port 
+hostname = Socket.gethostname
+
+puts "mimic agent is running on TCP port: #{port}"
+puts "Press Control-C to exit"
+
+loop do
+  client = server.accept    # Wait for a client to connect
+  client.puts "Hostname: #{hostname}" 
+  client.puts "LastBootTime: #{Vmstat.boot_time}" 
+  client.puts Vmstat.cpu 
+  client.puts Vmstat.memory 
+  client.puts Vmstat.load_average 
+  client.puts Vmstat.network_interfaces 
+  client.puts "Localtime: #{Time.now}"
+  client.close
+end
+
+rescue Interrupt
+  puts "\nexiting..."
+  File.delete(pid)
+rescue Exception => e
+puts e
+end

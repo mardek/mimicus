@@ -1,4 +1,4 @@
 mimicus
 =======
 
-Monitoring Solution based on ruby
+Monitoring Solution Cloud Oriented based on Ruby.
