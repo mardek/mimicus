@@ -1,21 +1,13 @@
-#! /usr/bin/env ruby
-require("fiddle")
-
-def set_process_name(name)
-    RUBY_PLATFORM.index("linux") or return
-    Fiddle::Function.new(
-        DL::Handle["prctl"], [
-            Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP,
-            Fiddle::TYPE_LONG, Fiddle::TYPE_LONG,
-            Fiddle::TYPE_LONG
-        ], Fiddle::TYPE_INT
-    ).call(15, name, 0, 0, 0)
-end
-
-
-# Load the first module
-require 'yaml'
-require 'process'
+#!/usr/bin/env ruby
+# Load needed modules
+#
+require 'vmstat' # dep 
+require 'socket'
+require 'yaml' # dep
+require 'process' # dep
+require 'usagewatch' #dep
+require 'uname'
+require 'sysinfo'
 
 # Default Mimic Configuration file path 
 conf="/etc/mimic/mimic.conf"
@@ -49,15 +41,13 @@ end
 # We start now !!
 begin
 
-# Load needed modules
-require 'vmstat' 
-require 'socket'
 
 # Grab the port number in the configuration file
 port = config['port']
 srv = config['server']
 
 server = TCPServer.new port 
+
 hostname = Socket.gethostname
 
 puts "mimic agent is running on TCP port: #{port}"
@@ -125,16 +115,33 @@ def getnicstat
      end
 end
 
+def command?(command)
+    system("which #{ command} > /dev/null 2>&1")
+end
+
 loop do
+    sysinfo = SysInfo.new
     client = server.accept    # Wait for a client to connect
     client.puts "Hostname: #{hostname}" 
-    client.puts "LastBootTime: #{Vmstat.boot_time}" 
+    client.puts "OS Family: #{sysinfo.os}, type=#{sysinfo.impl}, ruby-version=#{sysinfo.ruby}" 
+    client.puts "Uname: #{Uname.invokeUname("-a")}" 
+    client.puts "LastBootTime: #{Vmstat.boot_time}, uptime=#{sysinfo.uptime}" 
     client.puts "Localtime: #{Time.now}"  
     client.puts getcpu
-    client.puts getmem  
     client.puts getloadavg
+    if command?("free")
+    client.puts getmem  
+    else
+        client.puts "Memory: OS type is not supported."
+    end
+
     client.puts getswap 
-    client.puts getio
+    if command?("iostat")
+        client.puts getio
+    else
+        client.puts "iostat: Package not installed"
+    end
+
     getdiskpath.each do |d|
         client.puts getdisk(d) 
     end
@@ -142,11 +149,14 @@ loop do
     client.puts getnicstat 
     getnics.split(" ").each do |n|
         if getnicip(n).length != 0
-        client.puts "IP: #{n}=#{getnicip(n)}"
+        client.puts "NIC=:#{n}, ipaddr=#{getnicip(n)}"
         else
-        client.puts "IP: #{n}=nil"
+        client.puts "NIC=:#{n}, ipaddr=nil"
     end
     end
+    client.puts "CPU Top: #{Usagewatch.uw_cputop}"
+    client.puts "Mem Top: #{Usagewatch.uw_memtop}"
+
     client.close
 
     if ARGV[0] == "-d"
@@ -154,7 +164,6 @@ loop do
 end
 end
 
-set_process_name("mimic")
 
 rescue Interrupt
     puts "\nexiting..."
