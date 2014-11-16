@@ -1,4 +1,18 @@
 #! /usr/bin/env ruby
+require("fiddle")
+
+def set_process_name(name)
+    RUBY_PLATFORM.index("linux") or return
+    Fiddle::Function.new(
+        DL::Handle["prctl"], [
+            Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP,
+            Fiddle::TYPE_LONG, Fiddle::TYPE_LONG,
+            Fiddle::TYPE_LONG
+        ], Fiddle::TYPE_INT
+    ).call(15, name, 0, 0, 0)
+end
+
+
 # Load the first module
 require 'yaml'
 require 'process'
@@ -21,15 +35,14 @@ end
 
 # Check if the PID file is still there
 if File.exist?(pid)
-puts "mimic agent is alredy running !!!"
-
-oldpidfile = File.open(pid, "r")
-oldpid = oldpidfile.read
-oldpidfile.close
-exit
-
+    puts "mimic agent is alredy running !!!"
+    
+    oldpidfile = File.open(pid, "r")
+    oldpid = oldpidfile.read
+    oldpidfile.close
+    exit
 else
-File.write(pid, Process.pid) # Then write the new PID onto the pid file
+    File.write(pid, Process.pid) # Then write the new PID onto the pid file
 end
 
 
@@ -42,6 +55,7 @@ require 'socket'
 
 # Grab the port number in the configuration file
 port = config['port']
+srv = config['server']
 
 server = TCPServer.new port 
 hostname = Socket.gethostname
@@ -49,21 +63,102 @@ hostname = Socket.gethostname
 puts "mimic agent is running on TCP port: #{port}"
 puts "Press Control-C to exit"
 
-loop do
-  client = server.accept    # Wait for a client to connect
-  client.puts "Hostname: #{hostname}" 
-  client.puts "LastBootTime: #{Vmstat.boot_time}" 
-  client.puts Vmstat.cpu 
-  client.puts Vmstat.memory 
-  client.puts Vmstat.load_average 
-  client.puts Vmstat.network_interfaces 
-  client.puts "Localtime: #{Time.now}"
-  client.close
+def getswap # To replace someday by a native ruby module
+    `free | grep Swap | awk -F ' ' '{print "Swap: total="$2", used="$3", free="$4}'`
 end
 
+def getio # To replace someday by a native module too !!!
+    `iostat | grep -A1  avg-cpu  | sed '/^$/d' | tail -n1| awk -F ' ' '{print "iostat: user="$1", nice="$2", system="$3", iowait="$4", steal="$5", idle="$6}'`
+end
+
+def getcpu
+    cpuarr = Vmstat.cpu.map { |i| i.to_s }.join("")
+    cpuarr = cpuarr.split(">")
+    cpuarr = cpuarr.map {|e| e.gsub(/#<struct Vmstat::/,'')}
+    cpuarr = cpuarr.map {|e| e.gsub(/Cpu/,'Cpu:')}
+end
+
+def getmem
+    `free | grep Mem | awk -F ' ' '{print "Memory: total="$2", used="$3", free="$4", shared="$5", Buff/cache="$6", avail="$7}'`
+end
+
+def getloadavg
+    loadavg = Vmstat.load_average
+    loadavg = loadavg.to_s.gsub('#<struct Vmstat::LoadAverage', 'LoadAverage:')
+    loadavg = loadavg.to_s.gsub('>', '')
+    return loadavg
+end
+
+def getdiskpath
+    i = `df | egrep -v "tmpfs|nfs"  | awk -F " " '{print $6}' | grep -v Mounted | xargs`
+    i = i.split(" ")
+ return i
+end
+
+def getdisk(d)
+    disk = Vmstat.disk(d)
+    disk = disk.to_s.gsub('#<struct Vmstat::', '')
+    disk = disk.to_s.gsub('>', '')
+    return disk
+end
+
+def getnics
+    `egrep -v "face |Inter-|lo" /proc/net/dev | awk -F ": " '{print $1}'| xargs `#.split(",")
+end
+
+def getnicip(nic)
+    `ip addr show dev #{nic} | awk -F "inet " '{print $2}' | sed '/^$/d' |  awk -F " " '{print $1}'` 
+end
+
+def getnicstat
+    nicstats = Vmstat.network_interfaces.map { |i| i.to_s }.join("")
+    
+    nicstats = nicstats.split(">")
+    nicstats = nicstats.map {|e| e.gsub(/#<struct Vmstat::/,'')}
+    nicstats = nicstats.map {|e| e.gsub(/Cpu/,'Cpu:')}
+    nicstats = nicstats.map {|e| e.gsub(/, type=24/,'')} # We don't need that in the mimic DB
+    nicstats = nicstats.map {|e| e.gsub(/, type=nil/,'')} # We don't need that in the mimic DB
+
+    for line in nicstats
+        nicstats.delete line if line.include? ":lo,"
+        return nicstats
+     end
+end
+
+loop do
+    client = server.accept    # Wait for a client to connect
+    client.puts "Hostname: #{hostname}" 
+    client.puts "LastBootTime: #{Vmstat.boot_time}" 
+    client.puts "Localtime: #{Time.now}"  
+    client.puts getcpu
+    client.puts getmem  
+    client.puts getloadavg
+    client.puts getswap 
+    client.puts getio
+    getdiskpath.each do |d|
+        client.puts getdisk(d) 
+    end
+
+    client.puts getnicstat 
+    getnics.split(" ").each do |n|
+        if getnicip(n).length != 0
+        client.puts "IP: #{n}=#{getnicip(n)}"
+        else
+        client.puts "IP: #{n}=nil"
+    end
+    end
+    client.close
+
+    if ARGV[0] == "-d"
+    puts "mimic tentacle: #{hostname} check done, sent to #{srv}"
+end
+end
+
+set_process_name("mimic")
+
 rescue Interrupt
-  puts "\nexiting..."
-  File.delete(pid)
+    puts "\nexiting..."
+    File.delete(pid)
 rescue Exception => e
-puts e
+    puts e
 end
