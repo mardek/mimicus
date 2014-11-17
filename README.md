@@ -1,6 +1,6 @@
 # Mimicus
 
-TODO: Write a gem description
+Monitoring Solution, Cloud Oriented based on Ruby and Redis
 
 ## Installation
 
@@ -21,11 +21,17 @@ Or install it yourself as:
 ## Usage
 
 require 'vmstat'
+
 require 'socket'
+
 require 'yaml' 
+
 require 'process'
+
 require 'usagewatch'
+
 require 'uname'
+
 require 'sysinfo'
 
 ## Contributing
