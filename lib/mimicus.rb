@@ -1,17 +1,31 @@
 require "mimicus/version"
 require 'vmstat'
 
+#$PROGRAM_NAME = "mimicus-agent"
+
 module Mimicus
 
-    def Mimicus.getswap # To replace someday by a native ruby module
+    
+    def self.getpid
+        pid = `pgrep -f "#{$PROGRAM_NAME} | head -n1"`
+        return pid
+    end
+
+
+    def self.getswap # To replace someday by a native ruby module
         `free | grep Swap | awk -F ' ' '{print "Swap: total="$2", used="$3", free="$4}'`
     end
     
-    def Mimicus.getio # To replace someday by a native module too !!!
+    def self.getio # To replace someday by a native module too !!!
         `iostat | grep -A1  avg-cpu  | sed '/^$/d' | tail -n1| awk -F ' ' '{print "iostat: user="$1", nice="$2", system="$3", iowait="$4", steal="$5", idle="$6}'`
     end
     
-    def Mimicus.getcpu
+    def self.getcpu
+        #   The number of the cpu starting at 0 for the first cpu.
+        #   Current counter of ticks spend in user. The counter can overflow.
+        #   Current counter of ticks spend in system. The counter can overflow.
+        #   Current counter of ticks spend in nice. The counter can overflow.
+        #   Current counter of ticks spend in idle. The counter can overflow.
         cpuarr = Vmstat.cpu.map { |i| i.to_s }.join("")
         cpuarr = cpuarr.split(">")
         cpuarr = cpuarr.map {|e| e.gsub(/#<struct Vmstat::/,'')}
@@ -19,39 +33,47 @@ module Mimicus
         return cpuarr
     end
     
-    def Mimicus.getmem
+    def self.getuname
+        return `uname -a`
+    end
+
+    def self.getmem
         `free | grep Mem | awk -F ' ' '{print "Memory: total="$2", used="$3", free="$4", shared="$5", Buff/cache="$6", avail="$7}'`
     end
     
-    def Mimicus.getloadavg
+    def self.getcpustats
+        `vmstat -a | tail -n1 | awk -F ' ' '{print"Cpu stats: us=" $13", sys=" $14", id=" $15", wa="$16", steal="$17}'`
+    end
+
+    def self.getloadavg
         loadavg = Vmstat.load_average
         loadavg = loadavg.to_s.gsub('#<struct Vmstat::LoadAverage', 'LoadAverage:')
         loadavg = loadavg.to_s.gsub('>', '')
         return loadavg
     end
     
-    def Mimicus.getdiskpath
+    def self.getdiskpath
         i = `df | egrep -v "tmpfs|nfs"  | awk -F " " '{print $6}' | grep -v Mounted | xargs`
         i = i.split(" ")
      return i
     end
     
-    def Mimicus.getdisk(d)
+    def self.getdisk(d)
         disk = Vmstat.disk(d)
         disk = disk.to_s.gsub('#<struct Vmstat::', '')
         disk = disk.to_s.gsub('>', '')
         return disk
     end
     
-    def Mimicus.getnics
+    def self.getnics
         `egrep -v "face |Inter-|lo" /proc/net/dev | awk -F ": " '{print $1}'| xargs `#.split(",")
     end
     
-    def Mimicus.getnicip(nic)
+    def self.getnicip(nic)
         `ip addr show dev #{nic} | awk -F "inet " '{print $2}' | sed '/^$/d' |  awk -F " " '{print $1}'` 
     end
     
-    def Mimicus.getnicstat
+    def self.getnicstat
         nicstats = Vmstat.network_interfaces.map { |i| i.to_s }.join("")
         
         nicstats = nicstats.split(">")
@@ -66,7 +88,7 @@ module Mimicus
          end
     end
     
-    def Mimicus.command?(command)
+    def self.command?(command)
         system("which #{ command} > /dev/null 2>&1")
     end
   

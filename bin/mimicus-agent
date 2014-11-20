@@ -8,81 +8,75 @@ $PROGRAM_NAME = 'mimicus-agent'
 
 # Load needed modules
 require 'mimicus'
-require 'vmstat' # dep 
 require 'socket'
-require 'yaml' # dep
-require 'process' # dep
+require 'logger' #dep
+require 'vmstat' #dep 
+require 'yaml' #dep
+require 'process' #dep
 require 'usagewatch' #dep
 require 'sysinfo' #dep
 
 # Default Mimic Configuration file path 
-conf="/etc/mimic/mimic.conf"
-pidfile="/var/tmp/mimic.pid"
-#pid="/var/run/mimic.pid"
+conf="/etc/mimicus/mimicus-agent.conf"
 
 # The Mimic conf file repo URL
 conf_ex="https://github.com/mardek/mimicus/blob/master/conf"
 
 if ARGV[0] == nil
-    puts "Usage: <start>|<stop>|<restart>"
+    puts "Usage: <start>|<stop>"
     exit
 elsif ARGV[0] == "help"
-    puts "Usage: <start>|<stop>|<restart>"
+    puts "Usage: <start>|<stop>"
     exit
 else
 
 # Some basic conf check
 if File.exist?(conf)
-	config = YAML.load_file(conf)
+	config = YAML.load_file(conf) # Load the config file
+
+
 else
 	puts "Configuration file missing : #{conf}"
 	puts "Please fetch a config file examples at #{conf_ex}"
     exit
 end
 
-# Check if the PID file is still there
-
-def getpid
-    pid = `pgrep -f "#{$PROGRAM_NAME} | head -n1"`
-    return pid
-end
-
+# Load the configuration 
 port = config['port']
 server = config['server']
 
+pidfile = config['pidfile']
+logfile = config['logfile']
 
-if ARGV[0] == "stop"  and getpid.to_i != nil
-    #puts "Mimicus agent stopped..." 
+# We Begin now
+if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
 
-    if "#{Process.pid.to_i}" == "#{getpid.to_i}" then
+    # Stop process
+    if "#{Process.pid.to_i}" == "#{Mimicus.getpid.to_i}" then
         puts "#{$PROGRAM_NAME} already stopped..."
         exit 1
     end
 
-    Process.kill('KILL', getpid.to_i)
+    Process.kill('KILL', Mimicus.getpid.to_i)
     puts "Mimicus agent stopped..." 
     File.delete(pidfile) # Then write the new PID onto the pid file
     
+    # Start process
     elsif ARGV[0] == "start"
 
-    if "#{Process.pid.to_i}" != "#{getpid.to_i}" then
+    if "#{Process.pid.to_i}" != "#{Mimicus.getpid.to_i}" then
         puts "Mimicus agent is alredy running !!!"
         exit
     else
-        #pid = Process.pid
-        #puts "Starting Mimicus agent..."
-        #File.write(pidfile, pid) # Then write the new PID onto the pid file
     
         pid = fork do
-
 
         srv = TCPServer.new port 
         hostname = Socket.gethostname
         
-        #ppid = Process.pid
         puts "Starting Mimicus agent..."
         puts "Mimicus agent is running on TCP port: #{port}"
-        File.write(pidfile, getpid.to_i) # Then write the new PID onto the pid file
+        File.write(pidfile, Mimicus.getpid.to_i) # Then write the new PID onto the pid file
         
         
             loop do
@@ -128,15 +122,22 @@ if ARGV[0] == "stop"  and getpid.to_i != nil
             
                 client.close
             
+                log = Logger.new(logfile) 
+                log.level = Logger::INFO 
+
+                logtrace = "#{Time.now} - Mimic agent : \"#{hostname}\" tentacle check sent to #{server}"
+
+                log.debug logtrace 
+
+                open(logfile, 'a') do |f|
+                  f.puts logtrace 
                 end
-                if ARGV[0] == "--verbose"
-                puts "#{Time.now} - Mimic agent : \"#{hostname}\" tentacle check sent to #{server}"
+
                 end
             end
         end
     exit 1 
     else
-    puts "Usage: <start>|<stop>|<restart>"
+    puts "Usage: <start>|<stop>"
 end
 end
-#end

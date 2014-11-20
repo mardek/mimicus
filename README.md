@@ -30,8 +30,6 @@ require 'process'
 
 require 'usagewatch'
 
-require 'uname'
-
 require 'sysinfo'
 
 ## Contributing
