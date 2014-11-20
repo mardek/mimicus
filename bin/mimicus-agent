@@ -1,0 +1,142 @@
+#!/usr/bin/env ruby
+# Project Name : Mimicus
+# License : GPL3
+# Author : martial.ndeko@gmail.com
+# homepage : https://github.com/mardek/mimicus 
+
+$PROGRAM_NAME = 'mimicus-agent'
+
+# Load needed modules
+require 'mimicus'
+require 'vmstat' # dep 
+require 'socket'
+require 'yaml' # dep
+require 'process' # dep
+require 'usagewatch' #dep
+require 'sysinfo' #dep
+
+# Default Mimic Configuration file path 
+conf="/etc/mimic/mimic.conf"
+pidfile="/var/tmp/mimic.pid"
+#pid="/var/run/mimic.pid"
+
+# The Mimic conf file repo URL
+conf_ex="https://github.com/mardek/mimicus/blob/master/conf"
+
+if ARGV[0] == nil
+    puts "Usage: <start>|<stop>|<restart>"
+    exit
+elsif ARGV[0] == "help"
+    puts "Usage: <start>|<stop>|<restart>"
+    exit
+else
+
+# Some basic conf check
+if File.exist?(conf)
+	config = YAML.load_file(conf)
+else
+	puts "Configuration file missing : #{conf}"
+	puts "Please fetch a config file examples at #{conf_ex}"
+    exit
+end
+
+# Check if the PID file is still there
+
+def getpid
+    pid = `pgrep -f "#{$PROGRAM_NAME} | head -n1"`
+    return pid
+end
+
+port = config['port']
+server = config['server']
+
+
+if ARGV[0] == "stop"  and getpid.to_i != nil
+    #puts "Mimicus agent stopped..." 
+
+    if "#{Process.pid.to_i}" == "#{getpid.to_i}" then
+        puts "#{$PROGRAM_NAME} already stopped..."
+        exit 1
+    end
+
+    Process.kill('KILL', getpid.to_i)
+    puts "Mimicus agent stopped..." 
+    File.delete(pidfile) # Then write the new PID onto the pid file
+    
+    elsif ARGV[0] == "start"
+
+    if "#{Process.pid.to_i}" != "#{getpid.to_i}" then
+        puts "Mimicus agent is alredy running !!!"
+        exit
+    else
+        #pid = Process.pid
+        #puts "Starting Mimicus agent..."
+        #File.write(pidfile, pid) # Then write the new PID onto the pid file
+    
+        pid = fork do
+
+
+        srv = TCPServer.new port 
+        hostname = Socket.gethostname
+        
+        #ppid = Process.pid
+        puts "Starting Mimicus agent..."
+        puts "Mimicus agent is running on TCP port: #{port}"
+        File.write(pidfile, getpid.to_i) # Then write the new PID onto the pid file
+        
+        
+            loop do
+                sysinfo = SysInfo.new
+                client = srv.accept    # Wait for a client to connect
+                client.puts "Hostname: #{hostname}" 
+                client.puts "OS Family: #{sysinfo.os}, type=#{sysinfo.impl}, ruby-version=#{sysinfo.ruby}" 
+                client.puts "Uname: #{Mimicus.getuname}" 
+                client.puts "LastBootTime: #{Vmstat.boot_time}, uptime=#{sysinfo.uptime}" 
+                client.puts "Localtime: #{Time.now}"  
+                client.puts Mimicus.getcpustats
+                client.puts Mimicus.getcpu
+                client.puts Mimicus.getloadavg
+    
+                if Mimicus.command?("free")
+                    client.puts Mimicus.getmem  
+                else
+                    client.puts "Memory: OS type is not supported."
+                end
+            
+                client.puts Mimicus.getswap 
+                if Mimicus.command?("iostat")
+                    client.puts Mimicus.getio
+                else
+                    client.puts "iostat: Package not installed"
+                end
+            
+                Mimicus.getdiskpath.each do |d|
+                    client.puts Mimicus.getdisk(d) 
+                end
+            
+                client.puts Mimicus.getnicstat 
+                getnics = Mimicus.getnics
+                getnics.split(" ").each do |n|
+                    if Mimicus.getnicip(n).length != 0
+                    client.puts "NIC=:#{n}, ipaddr=#{Mimicus.getnicip(n)}"
+                    else
+                    client.puts "NIC=:#{n}, ipaddr=nil"
+                end
+                end
+                client.puts "CPU Top: #{Usagewatch.uw_cputop}"
+                client.puts "Mem Top: #{Usagewatch.uw_memtop}"
+            
+                client.close
+            
+                end
+                if ARGV[0] == "--verbose"
+                puts "#{Time.now} - Mimic agent : \"#{hostname}\" tentacle check sent to #{server}"
+                end
+            end
+        end
+    exit 1 
+    else
+    puts "Usage: <start>|<stop>|<restart>"
+end
+end
+#end
