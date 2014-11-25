@@ -23,10 +23,10 @@ conf="/etc/mimicus/mimicus-agent.conf"
 conf_ex="https://github.com/mardek/mimicus/blob/master/conf"
 
 if ARGV[0] == nil
-    puts "Usage: <start>|<stop>"
+    puts "Usage: <start>|<stop>|<status>"
     exit
 elsif ARGV[0] == "help"
-    puts "Usage: <start>|<stop>"
+    puts "Usage: <start>|<stop>|<status>"
     exit
 else
 
@@ -49,6 +49,21 @@ pidfile = config['pidfile']
 logfile = config['logfile']
 
 # We Begin now
+if ARGV[0] == "status"  and Mimicus.getpid.to_i != nil 
+    
+    if File.exist?(pidfile)
+
+    pid = File.read(pidfile) 
+        if Mimicus.getpid.to_i == pid.to_i 
+            puts "Mimicus agent is running..." 
+            exit 1
+        end
+    else
+        puts "Mimicus agent is stopped..." 
+        exit 1
+    end
+end
+
 if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
 
     # Stop process
@@ -57,7 +72,9 @@ if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
         exit 1
     end
 
-    Process.kill('KILL', Mimicus.getpid.to_i)
+    pid = File.read(pidfile) 
+    Process.kill('KILL', pid.to_i)
+
     puts "Mimicus agent stopped..." 
     File.delete(pidfile) # Then write the new PID onto the pid file
     
@@ -138,6 +155,6 @@ if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
         end
     exit 1 
     else
-    puts "Usage: <start>|<stop>"
+    puts "Usage: <start>|<stop>|<status>"
 end
 end
