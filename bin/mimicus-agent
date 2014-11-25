@@ -50,9 +50,8 @@ logfile = config['logfile']
 
 # We Begin now
 if ARGV[0] == "status"  and Mimicus.getpid.to_i != nil 
-    
+     
     if File.exist?(pidfile)
-
     pid = File.read(pidfile) 
         if Mimicus.getpid.to_i == pid.to_i 
             puts "Mimicus agent is running..." 
@@ -64,22 +63,33 @@ if ARGV[0] == "status"  and Mimicus.getpid.to_i != nil
     end
 end
 
-if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
+if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil 
 
     # Stop process
-    if "#{Process.pid.to_i}" == "#{Mimicus.getpid.to_i}" then
-        puts "#{$PROGRAM_NAME} already stopped..."
-        exit 1
+    if File.exist?(pidfile) 
+        pid = File.read(pidfile) 
+        if "#{Process.pid.to_i}" == "#{Mimicus.getpid.to_i}" then
+        #elsif "#{Process.pid.to_i}" == "#{pid.to_i}" and pid.to_i == Mimicus.getpid.to_i 
+                puts "#{$PROGRAM_NAME} already stopped..."
+    #            unless File.exist?(pidfile)
+                exit 1
+        end
+    else
+                puts "#{$PROGRAM_NAME} already stopped..."
+                exit 1
     end
 
     pid = File.read(pidfile) 
     Process.kill('KILL', pid.to_i)
-
+    
     puts "Mimicus agent stopped..." 
     File.delete(pidfile) # Then write the new PID onto the pid file
-    
-    # Start process
-    elsif ARGV[0] == "start"
+    exit 1 
+
+end
+
+# Start process
+if ARGV[0] == "start"
 
     if "#{Process.pid.to_i}" != "#{Mimicus.getpid.to_i}" then
         puts "Mimicus agent is alredy running !!!"
@@ -87,7 +97,7 @@ if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
     else
     
         pid = fork do
-
+    
         srv = TCPServer.new port 
         hostname = Socket.gethostname
         
@@ -141,20 +151,20 @@ if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
             
                 log = Logger.new(logfile) 
                 log.level = Logger::INFO 
-
+    
                 logtrace = "#{Time.now} - Mimic agent : \"#{hostname}\" tentacle check sent to #{server}"
-
+    
                 log.debug logtrace 
-
+    
                 open(logfile, 'a') do |f|
                   f.puts logtrace 
                 end
-
+    
                 end
             end
         end
     exit 1 
     else
     puts "Usage: <start>|<stop>|<status>"
-end
+    end
 end

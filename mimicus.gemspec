@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'mimicus/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "mimicus"
+  spec.name          = "mimicus-agent"
   spec.version       = Mimicus::VERSION
   spec.authors       = ["mardek"]
   spec.email         = ["martial.ndeko@gmail.com"]
@@ -21,8 +21,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'sysinfo'
   spec.add_dependency 'vmstat'
   spec.add_dependency 'process'
-  spec.add_dependency 'uname'
   spec.add_dependency 'usagewatch'
+  spec.add_dependency 'rest_client'
+
   #spec.add_dependency 'yaml'
 
   spec.required_ruby_version = ">= 1.9.7"
