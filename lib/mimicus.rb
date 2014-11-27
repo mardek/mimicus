@@ -11,15 +11,21 @@ module Mimicus
         return pid
     end
 
-
     def self.getswap # To replace someday by a native ruby module
         `free | grep Swap | awk -F ' ' '{print "Swap: total="$2", used="$3", free="$4}'`
     end
     
     def self.getio # To replace someday by a native module too !!!
-        `iostat | grep -A1  avg-cpu  | sed '/^$/d' | tail -n1| awk -F ' ' '{print "iostat: user="$1", nice="$2", system="$3", iowait="$4", steal="$5", idle="$6}'`
+        `iostat | grep -A1  avg-cpu  | sed '/^$/d' | tail -n1| awk -F ' ' '{print "iostat: user => "$1", nice="$2", system="$3", iowait="$4", steal="$5", idle="$6}'`
     end
-    
+ 
+    def self.top(comp)
+       top = `ps axo ruser,%#{comp},comm,pid,euser --sort=-%#{comp} | head -n 11 | tail -n 10 | awk -F " " '{print "{\\"user\\":\\""$1"\\", \\"#{comp}\\":\\""$2"\\", \\"cmd\\":\\""$3"\\", \\"pid\\":\\""$4"\\"},"}'`
+       top = top.to_s
+       top = top.chomp
+       return top
+    end
+   
     def self.getcpu
         #   The number of the cpu starting at 0 for the first cpu.
         #   Current counter of ticks spend in user. The counter can overflow.
@@ -34,7 +40,7 @@ module Mimicus
     end
     
     def self.getuname
-        return `uname -a`
+        return `uname -a`.chomp
     end
 
     def self.getmem
@@ -66,7 +72,8 @@ module Mimicus
     end
     
     def self.getnics
-        `egrep -v "face |Inter-|lo" /proc/net/dev | awk -F ": " '{print $1}'| xargs `#.split(",")
+        #`egrep -v "face |Inter-|lo" /proc/net/dev | awk -F ": " '{print $1}'| xargs `#.split(",")
+        `egrep -v "face |Inter-|lo" /proc/net/dev | awk -F ": " '{print $1}'| xargs`
     end
     
     def self.getnicip(nic)
@@ -78,12 +85,15 @@ module Mimicus
         
         nicstats = nicstats.split(">")
         nicstats = nicstats.map {|e| e.gsub(/#<struct Vmstat::/,'')}
-        nicstats = nicstats.map {|e| e.gsub(/Cpu/,'Cpu:')}
+        #nicstats = nicstats.map {|e| e.gsub(/Cpu/,'Cpu:')}
+        nicstats = nicstats.map {|e| e.gsub(/NetworkInterface name=:/,'{"ifstat" : {"nic"="')}
         nicstats = nicstats.map {|e| e.gsub(/, type=24/,'')} # We don't need that in the mimic DB
         nicstats = nicstats.map {|e| e.gsub(/, type=nil/,'')} # We don't need that in the mimic DB
+        #nicstats = nicstats.map {|e| e.gsub(/, /,', :')}
     
+        #puts nicstats
         for line in nicstats
-            nicstats.delete line if line.include? ":lo,"
+            nicstats.delete line if line.include? "=> lo,"
             return nicstats
          end
     end

@@ -1,6 +1,6 @@
 # Mimicus
 
-Monitoring Solution, Cloud Oriented based on Ruby and Redis
+Monitoring Solution, Cloud Oriented based on Ruby and Redis for GNU/Linux distros
 
 ## Installation
 
@@ -23,8 +23,6 @@ Or install it yourself as:
 require 'vmstat'
 
 require 'socket'
-
-require 'yaml' 
 
 require 'process'
 

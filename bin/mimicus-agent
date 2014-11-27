@@ -69,10 +69,13 @@ if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
     if File.exist?(pidfile) 
         pid = File.read(pidfile) 
         if "#{Process.pid.to_i}" == "#{Mimicus.getpid.to_i}" then
-        #elsif "#{Process.pid.to_i}" == "#{pid.to_i}" and pid.to_i == Mimicus.getpid.to_i 
-                puts "#{$PROGRAM_NAME} already stopped..."
-    #            unless File.exist?(pidfile)
-                exit 1
+            pid = File.read(pidfile) 
+            Process.kill('KILL', pid.to_i)
+            
+            puts "Mimicus agent stopped..." 
+            File.delete(pidfile) # Then write the new PID onto the pid file
+            exit 1 
+
         end
     else
                 puts "#{$PROGRAM_NAME} already stopped..."
@@ -93,7 +96,7 @@ if ARGV[0] == "start"
 
     if "#{Process.pid.to_i}" != "#{Mimicus.getpid.to_i}" then
         puts "Mimicus agent is alredy running !!!"
-        exit
+        exit 1
     else
     
         pid = fork do
@@ -109,11 +112,11 @@ if ARGV[0] == "start"
             loop do
                 sysinfo = SysInfo.new
                 client = srv.accept    # Wait for a client to connect
-                client.puts "Hostname: #{hostname}" 
-                client.puts "OS Family: #{sysinfo.os}, type=#{sysinfo.impl}, ruby-version=#{sysinfo.ruby}" 
-                client.puts "Uname: #{Mimicus.getuname}" 
-                client.puts "LastBootTime: #{Vmstat.boot_time}, uptime=#{sysinfo.uptime}" 
-                client.puts "Localtime: #{Time.now}"  
+                client.puts "\"Hostname\":\"#{hostname}\"," 
+                client.puts "\"OS Family\":\"#{sysinfo.os}\", \"type\":\"#{sysinfo.impl}\", \"ruby-version\":\"#{sysinfo.ruby}\"" 
+                client.puts "\"Uname\":\"#{Mimicus.getuname}\"," 
+                client.puts "\"LastBootTime\":\"#{Vmstat.boot_time}\", \"uptime\":\"#{sysinfo.uptime}\"," 
+                client.puts "\"Localtime\":\"#{Time.now}\","  
                 client.puts Mimicus.getcpustats
                 client.puts Mimicus.getcpu
                 client.puts Mimicus.getloadavg
@@ -121,32 +124,55 @@ if ARGV[0] == "start"
                 if Mimicus.command?("free")
                     client.puts Mimicus.getmem  
                 else
-                    client.puts "Memory: OS type is not supported."
+                    client.puts "Memory: OS type not supported."
                 end
             
                 client.puts Mimicus.getswap 
                 if Mimicus.command?("iostat")
                     client.puts Mimicus.getio
                 else
-                    client.puts "iostat: Package not installed"
+                    client.puts "iostat: Package sysstat not installed"
                 end
             
                 Mimicus.getdiskpath.each do |d|
                     client.puts Mimicus.getdisk(d) 
                 end
             
-                client.puts Mimicus.getnicstat 
+                nicstat =  Mimicus.getnicstat
+                nicstat = nicstat.to_s
+                #nicstat = nicstat.gsub(/\=/,'') 
+                #nicstat = nicstat.gsub(/,/,'",') 
+                nicstat = nicstat.gsub(/\"\,\ /,'') 
+                nicstat = nicstat.gsub(/\["/,'') 
+                nicstat = nicstat.gsub(/"\]/,'"}') 
+                nicstat = nicstat.gsub(/\,\ /,'", "') 
+
+                nicstat = nicstat.gsub("\"\{",'"}, {') 
+                nicstat = nicstat.gsub(/\\/,'') 
+                nicstat = nicstat.gsub(/\"\=\"/,'=') 
+                nicstat = nicstat.gsub(/=/,'":"') 
+                #nicstat = nicstat.gsub(/\"\"/,'"="') 
+                #nicstat = nicstat.gsub(/},/,'},'"\n")
+                #nicstat = nicstat.gsub(/ {/,'{')
+                #nicstat = nicstat.gsub(/ }/,'}')
+
+                client.puts nicstat + "},"
+
                 getnics = Mimicus.getnics
                 getnics.split(" ").each do |n|
                     if Mimicus.getnicip(n).length != 0
-                    client.puts "NIC=:#{n}, ipaddr=#{Mimicus.getnicip(n)}"
+                    client.puts "{\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"#{Mimicus.getnicip(n).chomp}\"}},"
                     else
-                    client.puts "NIC=:#{n}, ipaddr=nil"
+                    client.puts "{\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"nil\"}},"
                 end
                 end
-                client.puts "CPU Top: #{Usagewatch.uw_cputop}"
-                client.puts "Mem Top: #{Usagewatch.uw_memtop}"
-            
+
+                cputop = Mimicus.top("cpu")
+                client.puts "{\"cputop\" : #{cputop.chomp(',')}},"
+                
+                memtop = Mimicus.top("mem")
+                client.puts "{\"memtop\" : #{memtop.chomp(',')}}}"
+
                 client.close
             
                 log = Logger.new(logfile) 
@@ -156,11 +182,13 @@ if ARGV[0] == "start"
     
                 log.debug logtrace 
     
-                open(logfile, 'a') do |f|
-                  f.puts logtrace 
+                #if config['logelevel'] ="verbose|VERBOSE" 
+
+                #open(logfile, 'a') do |f|
+                #  f.puts logtrace 
+                #end
                 end
-    
-                end
+
             end
         end
     exit 1 
