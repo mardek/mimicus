@@ -112,66 +112,73 @@ if ARGV[0] == "start"
             loop do
                 sysinfo = SysInfo.new
                 client = srv.accept    # Wait for a client to connect
-                client.puts "\"Hostname\":\"#{hostname}\"," 
-                client.puts "\"OS Family\":\"#{sysinfo.os}\", \"type\":\"#{sysinfo.impl}\", \"ruby-version\":\"#{sysinfo.ruby}\"" 
-                client.puts "\"Uname\":\"#{Mimicus.getuname}\"," 
-                client.puts "\"LastBootTime\":\"#{Vmstat.boot_time}\", \"uptime\":\"#{sysinfo.uptime}\"," 
-                client.puts "\"Localtime\":\"#{Time.now}\","  
+                client.puts "{\"hostname\":\"#{hostname}\"," 
+                client.puts "\"OS Family\":\"#{sysinfo.os}\", \"type\":\"#{sysinfo.impl}\", \"ruby-version\":\"#{sysinfo.ruby}\"," 
+                client.puts "\"uname\":\"#{Mimicus.getuname}\"," 
+                client.puts "\"lastboot\":\"#{Vmstat.boot_time}\", \"uptime\":\"#{sysinfo.uptime}\"," 
+                client.puts "\"localtime\":\"#{Time.now}\","  
                 client.puts Mimicus.getcpustats
-                client.puts Mimicus.getcpu
+                getcpu = Mimicus.getcpu
+                for line in getcpu
+                    line = line.gsub("=","\":\"") 
+                    line = line.gsub(", ","\", \"") 
+                    line = line.gsub("{\\","{") 
+                    line = line + "\"},"  
+                    client.puts line
+                end
                 client.puts Mimicus.getloadavg
     
                 if Mimicus.command?("free")
                     client.puts Mimicus.getmem  
                 else
-                    client.puts "Memory: OS type not supported."
+                    client.puts "\"Memory\" : \"OS type not supported\""
                 end
             
                 client.puts Mimicus.getswap 
                 if Mimicus.command?("iostat")
                     client.puts Mimicus.getio
                 else
-                    client.puts "iostat: Package sysstat not installed"
+                    client.puts "{\"iostat\": \"Package sysstat not installed\"},"
                 end
             
                 Mimicus.getdiskpath.each do |d|
-                    client.puts Mimicus.getdisk(d) 
+                    getdisk = Mimicus.getdisk(d) 
+                    getdisk = getdisk.gsub("\{LinuxDisk type=:","\"LinuxDisk type\"=")
+                    getdisk = getdisk.gsub("\"", "")
+                    getdisk = getdisk.gsub("=", "\":\"")
+                    getdisk = getdisk.gsub(", ", "\", \"")
+                    client.puts "\"diskstat\" : \{\"" + getdisk + "\"\},"
                 end
             
                 nicstat =  Mimicus.getnicstat
                 nicstat = nicstat.to_s
-                #nicstat = nicstat.gsub(/\=/,'') 
-                #nicstat = nicstat.gsub(/,/,'",') 
-                nicstat = nicstat.gsub(/\"\,\ /,'') 
-                nicstat = nicstat.gsub(/\["/,'') 
-                nicstat = nicstat.gsub(/"\]/,'"}') 
-                nicstat = nicstat.gsub(/\,\ /,'", "') 
-
-                nicstat = nicstat.gsub("\"\{",'"}, {') 
-                nicstat = nicstat.gsub(/\\/,'') 
-                nicstat = nicstat.gsub(/\"\=\"/,'=') 
-                nicstat = nicstat.gsub(/=/,'":"') 
-                #nicstat = nicstat.gsub(/\"\"/,'"="') 
-                #nicstat = nicstat.gsub(/},/,'},'"\n")
-                #nicstat = nicstat.gsub(/ {/,'{')
-                #nicstat = nicstat.gsub(/ }/,'}')
-
-                client.puts nicstat + "},"
+                nicstat = nicstat.gsub('["ifstat\" : {\"nic\":\"','"ifstat" : [{"nic":"') 
+                nicstat = nicstat.gsub(', "ifstat\" : ',"},\n") 
+                nicstat = nicstat.gsub('{\"nic\":\"','{"nic":"') 
+                nicstat = nicstat.gsub(', in_bytes=','", "in_bytes"="') 
+                nicstat = nicstat.gsub(', in_errors=','", "in_errors"="') 
+                nicstat = nicstat.gsub(', in_drops=','", "in_drops"="') 
+                nicstat = nicstat.gsub(', out_bytes=','", "out_bytes"="') 
+                nicstat = nicstat.gsub(', out_errors=','", "out_errors"="') 
+                nicstat = nicstat.gsub("=",":") 
+                nicstat = nicstat.gsub("]","}],") 
+                client.puts nicstat 
 
                 getnics = Mimicus.getnics
+
                 getnics.split(" ").each do |n|
                     if Mimicus.getnicip(n).length != 0
-                    client.puts "{\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"#{Mimicus.getnicip(n).chomp}\"}},"
+                    client.puts "\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"#{Mimicus.getnicip(n).chomp}\"},"
                     else
-                    client.puts "{\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"nil\"}},"
+                    client.puts "\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"nil\"},"
                 end
                 end
 
                 cputop = Mimicus.top("cpu")
-                client.puts "{\"cputop\" : #{cputop.chomp(',')}},"
+                client.puts "\"cputop\" : [#{cputop.chomp(',')}],"
                 
                 memtop = Mimicus.top("mem")
-                client.puts "{\"memtop\" : #{memtop.chomp(',')}}}"
+                client.puts "\"memtop\" : [#{memtop.chomp(',')}]}"
 
                 client.close
             

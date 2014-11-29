@@ -12,11 +12,11 @@ module Mimicus
     end
 
     def self.getswap # To replace someday by a native ruby module
-        `free | grep Swap | awk -F ' ' '{print "Swap: total="$2", used="$3", free="$4}'`
+        `free | grep Swap | awk -F ' ' '{print "\\"Swap\\" : {\\"total\\":\\""$2"\\", \\"used\\":\\""$3"\\", \\"free\\":\\""$4"\\"},"}'`
     end
     
     def self.getio # To replace someday by a native module too !!!
-        `iostat | grep -A1  avg-cpu  | sed '/^$/d' | tail -n1| awk -F ' ' '{print "iostat: user => "$1", nice="$2", system="$3", iowait="$4", steal="$5", idle="$6}'`
+        `iostat | grep -A1  avg-cpu  | sed '/^$/d' | tail -n1| awk -F ' ' '{print "\\"iostat\\" : {\\"user\\":\\""$1"\\", \\"nice\\":\\""$2"\\", \\"system\\":\\""$3"\\", \\"iowait\\":\\""$4"\\", \\"steal\\":\\""$5"\\", \\"idle\\":\\""$6"\\"},"}'`
     end
  
     def self.top(comp)
@@ -33,10 +33,12 @@ module Mimicus
         #   Current counter of ticks spend in nice. The counter can overflow.
         #   Current counter of ticks spend in idle. The counter can overflow.
         cpuarr = Vmstat.cpu.map { |i| i.to_s }.join("")
+        #cpuarr = cpuarr.map {|e| e.gsub(/>/,'}')}
         cpuarr = cpuarr.split(">")
         cpuarr = cpuarr.map {|e| e.gsub(/#<struct Vmstat::/,'')}
-        cpuarr = cpuarr.map {|e| e.gsub(/Cpu/,'Cpu:')}
-        return cpuarr
+        cpuarr = cpuarr.map {|e| e.gsub(/Cpu /,'"Cpu" : {\"')}
+        cpuarr = cpuarr
+        return cpuarr #+ "\}"
     end
     
     def self.getuname
@@ -44,17 +46,20 @@ module Mimicus
     end
 
     def self.getmem
-        `free | grep Mem | awk -F ' ' '{print "Memory: total="$2", used="$3", free="$4", shared="$5", Buff/cache="$6", avail="$7}'`
+        `free | grep Mem | awk -F ' ' '{print "\\"memory\\" : {\\"total\\":\\""$2"\\", \\"used\\":\\""$3"\\", \\"free\\":\\""$4"\\", \\"shared\\":\\""$5"\\", \\"Buff/cache\\":\\""$6"\\", \\"avail\\":\\""$7"\\"},"}'`
     end
     
     def self.getcpustats
-        `vmstat -a | tail -n1 | awk -F ' ' '{print"Cpu stats: us=" $13", sys=" $14", id=" $15", wa="$16", steal="$17}'`
+        `vmstat -a | tail -n1 | awk -F ' ' '{print "\\"cpustat\\" : {\\"us\\":\\""$13"\\", \\"sys\\":\\""$14"\\", \\"id\\":\\""$15"\\", \\"wa\\":\\""$16"\\", \\"steal\\"=\\""$17"\\"},"}'`
     end
 
     def self.getloadavg
         loadavg = Vmstat.load_average
-        loadavg = loadavg.to_s.gsub('#<struct Vmstat::LoadAverage', 'LoadAverage:')
-        loadavg = loadavg.to_s.gsub('>', '')
+        loadavg = loadavg.to_s.gsub('#<struct Vmstat::LoadAverage ', '"LoadAverage" : {')
+        loadavg = loadavg.to_s.gsub('>', '"},')
+        loadavg = loadavg.to_s.gsub('one_minute=', '"one_minute":"')
+        loadavg = loadavg.to_s.gsub(', five_minutes=', '", "five_minutes":"')
+        loadavg = loadavg.to_s.gsub(', fifteen_minutes=', '", "fifteen_minutes":"')
         return loadavg
     end
     
@@ -68,6 +73,7 @@ module Mimicus
         disk = Vmstat.disk(d)
         disk = disk.to_s.gsub('#<struct Vmstat::', '')
         disk = disk.to_s.gsub('>', '')
+        disk = disk.to_s.gsub(/^/,'{')
         return disk
     end
     
@@ -86,16 +92,18 @@ module Mimicus
         nicstats = nicstats.split(">")
         nicstats = nicstats.map {|e| e.gsub(/#<struct Vmstat::/,'')}
         #nicstats = nicstats.map {|e| e.gsub(/Cpu/,'Cpu:')}
-        nicstats = nicstats.map {|e| e.gsub(/NetworkInterface name=:/,'{"ifstat" : {"nic"="')}
+        nicstats = nicstats.map {|e| e.gsub(/NetworkInterface name=:/,'ifstat" : {"nic":"')}
         nicstats = nicstats.map {|e| e.gsub(/, type=24/,'')} # We don't need that in the mimic DB
         nicstats = nicstats.map {|e| e.gsub(/, type=nil/,'')} # We don't need that in the mimic DB
+        #nicstats = nicstats.map {|e| e.gsub(' "ifstat" ','"ifstat" ')} # We don't need that in the mimic DB
+
         #nicstats = nicstats.map {|e| e.gsub(/, /,', :')}
     
-        #puts nicstats
-        for line in nicstats
-            nicstats.delete line if line.include? "=> lo,"
-            return nicstats
-         end
+        return nicstats
+        #for line in nicstats
+        #    nicstats.delete line if line.include? "\"lo\""
+        #    return nicstats 
+        # end
     end
     
     def self.command?(command)
