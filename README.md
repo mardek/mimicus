@@ -20,19 +20,19 @@ Or install it yourself as:
 
 ## Usage
 
-require 'vmstat'
-
-require 'socket'
-
-require 'process'
-
-require 'usagewatch'
-
-require 'sysinfo'
+1. Install ruby
+   # dnf install ruby
+2. Install rake
+   # gem install rake
+3. fetch the mimicus sources
+   # git clone https://github.com/mardek/mimicus
+4. Build the mimicus agent
+   # cd mimicus && rake
+   # gem install pkg/mimicus-version.gem
 
 ## Contributing
 
-1. Fork it ( https://github.com/[my-github-username]/mimicus/fork )
+1. Fork it ( https://github.com/mardek/mimicus/fork )
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
