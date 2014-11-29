@@ -21,12 +21,19 @@ Or install it yourself as:
 ## Usage
 
 1. Install ruby
+
    # dnf install ruby
+
 2. Install rake
+
    # gem install rake
+
 3. fetch the mimicus sources
+
    # git clone https://github.com/mardek/mimicus
+
 4. Build the mimicus agent
+
    # cd mimicus && rake
    # gem install pkg/mimicus-version.gem
 
