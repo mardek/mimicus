@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# Project Name : Mimicus
+# Project Name : MimicusAgent
 # License : GPL3
 # Author : martial.ndeko@gmail.com
 # homepage : https://github.com/mardek/mimicus 
@@ -13,11 +13,12 @@ require 'logger' #dep
 require 'vmstat' #dep 
 require 'yaml' #dep
 require 'process' #dep
-require 'usagewatch' #dep
 require 'sysinfo' #dep
+require "thread"
 
 # Default Mimic Configuration file path 
-conf="/etc/mimicus/mimicus-agent.conf"
+confpath="/etc/mimicus/"
+conf="#{confpath}mimicus-agent.conf"
 
 # The Mimic conf file repo URL
 conf_ex="https://github.com/mardek/mimicus/blob/master/conf"
@@ -37,7 +38,7 @@ if File.exist?(conf)
 
 else
 	puts "Configuration file missing : #{conf}"
-	puts "Please fetch a config file examples at #{conf_ex}"
+	puts "Please fetch a config file example at #{conf_ex}"
     exit
 end
 
@@ -48,12 +49,21 @@ server = config['server']
 pidfile = config['pidfile']
 logfile = config['logfile']
 
+begin
+log = Logger.new(logfile) 
+rescue Errno::EACCES
+  puts "Log Access denied, you have a permission problem, please change your log path."
+  exit 1
+     raise
+end
+
+
 # We Begin now
-if ARGV[0] == "status"  and Mimicus.getpid.to_i != nil 
+if ARGV[0] == "status"  and MimicusAgent.getpid.to_i != nil 
      
     if File.exist?(pidfile)
     pid = File.read(pidfile) 
-        if Mimicus.getpid.to_i == pid.to_i 
+        if MimicusAgent.getpid.to_i == pid.to_i 
             puts "Mimicus agent is running..." 
             exit 1
         end
@@ -63,12 +73,12 @@ if ARGV[0] == "status"  and Mimicus.getpid.to_i != nil
     end
 end
 
-if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil 
+if ARGV[0] == "stop" and MimicusAgent.getpid.to_i != nil 
 
     # Stop process
     if File.exist?(pidfile) 
         pid = File.read(pidfile) 
-        if "#{Process.pid.to_i}" == "#{Mimicus.getpid.to_i}" then
+        if "#{Process.pid.to_i}" == "#{MimicusAgent.getpid.to_i}" then
             pid = File.read(pidfile) 
             Process.kill('KILL', pid.to_i)
             
@@ -92,10 +102,13 @@ if ARGV[0] == "stop"  and Mimicus.getpid.to_i != nil
 end
 
 # Start process
-if ARGV[0] == "start"
+if ARGV[0] == "start" and MimicusAgent.getpid.to_i != nil 
+begin
+#srv = TCPServer.new port
+end
 
-    if "#{Process.pid.to_i}" != "#{Mimicus.getpid.to_i}" then
-        puts "Mimicus agent is alredy running !!!"
+    if "#{Process.pid.to_i}" != "#{MimicusAgent.getpid.to_i}" then
+        puts "Mimicusagent is alredy running !!!"
         exit 1
     else
     
@@ -103,22 +116,27 @@ if ARGV[0] == "start"
     
         srv = TCPServer.new port 
         hostname = Socket.gethostname
+        sysinfo = SysInfo.new
         
         puts "Starting Mimicus agent..."
         puts "Mimicus agent is running on TCP port: #{port}"
-        File.write(pidfile, Mimicus.getpid.to_i) # Then write the new PID onto the pid file
+        File.write(pidfile, MimicusAgent.getpid.to_i) # Then write the new PID onto the pid file
         
-        
+
             loop do
-                sysinfo = SysInfo.new
-                client = srv.accept    # Wait for a client to connect
+            client = srv.accept
+            puts "Accepted connection from me"
+
+Thread.new do
+     begin
+
                 client.puts "{\"hostname\":\"#{hostname}\"," 
                 client.puts "\"OS Family\":\"#{sysinfo.os}\", \"type\":\"#{sysinfo.impl}\", \"ruby-version\":\"#{sysinfo.ruby}\"," 
-                client.puts "\"uname\":\"#{Mimicus.getuname}\"," 
+                client.puts "\"uname\":\"#{MimicusAgent.getuname}\"," 
                 client.puts "\"lastboot\":\"#{Vmstat.boot_time}\", \"uptime\":\"#{sysinfo.uptime}\"," 
                 client.puts "\"localtime\":\"#{Time.now}\","  
-                client.puts Mimicus.getcpustats
-                getcpu = Mimicus.getcpu
+                client.puts MimicusAgent.getcpustats
+                getcpu = MimicusAgent.getcpu
                 for line in getcpu
                     line = line.gsub("=","\":\"") 
                     line = line.gsub(", ","\", \"") 
@@ -126,23 +144,23 @@ if ARGV[0] == "start"
                     line = line + "\"},"  
                     client.puts line
                 end
-                client.puts Mimicus.getloadavg
+                client.puts MimicusAgent.getloadavg
     
-                if Mimicus.command?("free")
-                    client.puts Mimicus.getmem  
+                if MimicusAgent.command?("free")
+                    client.puts MimicusAgent.getmem  
                 else
                     client.puts "\"Memory\" : \"OS type not supported\""
                 end
             
-                client.puts Mimicus.getswap 
-                if Mimicus.command?("iostat")
-                    client.puts Mimicus.getio
+                client.puts MimicusAgent.getswap 
+                if MimicusAgent.command?("iostat")
+                    client.puts MimicusAgent.getio
                 else
                     client.puts "{\"iostat\": \"Package sysstat not installed\"},"
                 end
             
-                Mimicus.getdiskpath.each do |d|
-                    getdisk = Mimicus.getdisk(d) 
+                MimicusAgent.getdiskpath.each do |d|
+                    getdisk = MimicusAgent.getdisk(d) 
                     getdisk = getdisk.gsub("\{LinuxDisk type=:","\"LinuxDisk type\"=")
                     getdisk = getdisk.gsub("\"", "")
                     getdisk = getdisk.gsub("=", "\":\"")
@@ -150,10 +168,11 @@ if ARGV[0] == "start"
                     client.puts "\"diskstat\" : \{\"" + getdisk + "\"\},"
                 end
             
-                nicstat =  Mimicus.getnicstat
+                nicstat =  MimicusAgent.getnicstat
                 nicstat = nicstat.to_s
-                nicstat = nicstat.gsub('["ifstat\" : {\"nic\":\"','"ifstat" : [{"nic":"') 
-                nicstat = nicstat.gsub(', "ifstat\" : ',"},\n") 
+
+                nicstat = nicstat.gsub('["ifstat\" : {\"nic\":\"','"ifstat" : {"nic":"') 
+                nicstat = nicstat.gsub(', "ifstat\" : ',"\n\"ifstat\" : ") 
                 nicstat = nicstat.gsub('{\"nic\":\"','{"nic":"') 
                 nicstat = nicstat.gsub(', in_bytes=','", "in_bytes"="') 
                 nicstat = nicstat.gsub(', in_errors=','", "in_errors"="') 
@@ -161,45 +180,46 @@ if ARGV[0] == "start"
                 nicstat = nicstat.gsub(', out_bytes=','", "out_bytes"="') 
                 nicstat = nicstat.gsub(', out_errors=','", "out_errors"="') 
                 nicstat = nicstat.gsub("=",":") 
-                nicstat = nicstat.gsub("]","}],") 
-                client.puts nicstat 
+                nicstat = nicstat.gsub("]","") 
 
-                getnics = Mimicus.getnics
+                for line in nicstat.split("\n")
+                    line = line + "}," 
+                    client.puts line unless line =~ /\"lo\"/ 
+                end
+
+                getnics = MimicusAgent.getnics
 
                 getnics.split(" ").each do |n|
-                    if Mimicus.getnicip(n).length != 0
-                    client.puts "\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"#{Mimicus.getnicip(n).chomp}\"},"
+                    if MimicusAgent.getnicip(n).length != 0
+                    client.puts "\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"#{MimicusAgent.getnicip(n).chomp}\"},"
                     else
                     client.puts "\"ifconfig\" : {\"nic\":\"#{n}\", \"ipaddr\":\"nil\"},"
                 end
                 end
 
-                cputop = Mimicus.top("cpu")
+                cputop = MimicusAgent.top("cpu")
                 client.puts "\"cputop\" : [#{cputop.chomp(',')}],"
                 
-                memtop = Mimicus.top("mem")
+                memtop = MimicusAgent.top("mem")
                 client.puts "\"memtop\" : [#{memtop.chomp(',')}]}"
 
                 client.close
             
-                log = Logger.new(logfile) 
+                
                 log.level = Logger::INFO 
     
                 logtrace = "#{Time.now} - Mimic agent : \"#{hostname}\" tentacle check sent to #{server}"
     
                 log.debug logtrace 
     
-                #if config['logelevel'] ="verbose|VERBOSE" 
-
-                #open(logfile, 'a') do |f|
-                #  f.puts logtrace 
-                #end
-                end
 
             end
-        end
-    exit 1 
-    else
-    puts "Usage: <start>|<stop>|<status>"
+
     end
+    exit 1 
+    puts "Usage: <start>|<stop>|<status>"
+   end
+
+end
+end
 end
