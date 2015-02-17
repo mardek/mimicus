@@ -137,13 +137,14 @@ end
                 client.puts "\"localtime\":\"#{Time.now}\","  
                 client.puts MimicusAgent.getcpustats
                 getcpu = MimicusAgent.getcpu
-                for line in getcpu
-                    line = line.gsub("=","\":\"") 
-                    line = line.gsub(", ","\", \"") 
-                    line = line.gsub("{\\","{") 
-                    line = line + "\"},"  
-                    client.puts line
-                end
+                #for line in getcpu
+                #    line = line.gsub("=","\":\"") 
+                #    line = line.gsub(", ","\", \"") 
+                #    line = line.gsub("{\\","{") 
+                #    line = line + "\"},"  
+                #    client.puts line
+                    client.puts getcpu
+                #end
                 client.puts MimicusAgent.getloadavg
     
                 if MimicusAgent.command?("free")
