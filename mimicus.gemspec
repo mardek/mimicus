@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ["mardek"]
   spec.email         = ["martial.ndeko@gmail.com"]
   spec.summary       = ["Monitoring Solution, Cloud Oriented based on Ruby and Redis"]
-  spec.description   = ["Agent daemon monitoring tools for GNU/Linux"]
+  spec.description   = ["Server/Agent daemon monitoring tools for Linux and BSD"]
   spec.homepage      = "https://github.com/mardek/mimicus"
   spec.license       = "GPL3"
 
@@ -21,6 +21,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'sysinfo'
   spec.add_dependency 'vmstat'
   spec.add_dependency 'process'
+  spec.add_dependency 'usagewatch'
   spec.add_dependency 'rest_client'
 
   #spec.add_dependency 'yaml'

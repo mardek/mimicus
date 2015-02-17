@@ -127,8 +127,8 @@ end
             client = srv.accept
             puts "Accepted connection from me"
 
-Thread.new do
-     begin
+#Thread.new do
+#     begin
 
                 client.puts "{\"hostname\":\"#{hostname}\"," 
                 client.puts "\"OS Family\":\"#{sysinfo.os}\", \"type\":\"#{sysinfo.impl}\", \"ruby-version\":\"#{sysinfo.ruby}\"," 
@@ -220,6 +220,5 @@ Thread.new do
     puts "Usage: <start>|<stop>|<status>"
    end
 
-end
 end
 end

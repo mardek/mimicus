@@ -4,5 +4,4 @@ module Mimicus
 
 require 'vmstat'
 require "mimicus/agent"
-    
 end

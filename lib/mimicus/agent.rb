@@ -25,16 +25,18 @@ module MimicusAgent
     end
    
     def self.getcpu
+        cpuarr = `mpstat -P ALL`
         #   The number of the cpu starting at 0 for the first cpu.
         #   Current counter of ticks spend in user. The counter can overflow.
         #   Current counter of ticks spend in system. The counter can overflow.
         #   Current counter of ticks spend in nice. The counter can overflow.
         #   Current counter of ticks spend in idle. The counter can overflow.
-        cpuarr = Vmstat.cpu.map { |i| i.to_s }.join("")
-        cpuarr = cpuarr.split(">")
-        cpuarr = cpuarr.map {|e| e.gsub(/#<struct Vmstat::/,'')}
-        cpuarr = cpuarr.map {|e| e.gsub(/Cpu /,'"cpu" : {\"')}
-        cpuarr = cpuarr
+        cpuarr = cpuarr.gsub /^(?:[^\n]*\n){2}/, '' 
+        #cpuarr = Vmstat.cpu.map { |i| i.to_s }.join("")
+        #cpuarr = cpuarr.split(">")
+        #cpuarr = cpuarr.map {|e| e.gsub(/#<struct Vmstat::/,'')}
+        #cpuarr = cpuarr.map {|e| e.gsub(/Cpu /,'"cpu" : {\"')}
+        #cpuarr = cpuarr
         return cpuarr 
     end
     
