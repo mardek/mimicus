@@ -138,7 +138,7 @@ end
                 client.puts MimicusAgent.getcpustats
                 getcpu = MimicusAgent.getcpu
                 getcpu = getcpu.lines
-                getcpu = getcpu[2..-1]
+                getcpu = getcpu[3..-1]
                 getcpu = getcpu.join 
                 client.puts getcpu
                 client.puts MimicusAgent.getloadavg
