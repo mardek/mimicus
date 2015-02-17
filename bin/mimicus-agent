@@ -137,7 +137,8 @@ end
                 client.puts "\"localtime\":\"#{Time.now}\","  
                 client.puts MimicusAgent.getcpustats
                 getcpu = MimicusAgent.getcpu
-                client.puts getcpu.gsub(Regexp.new("([^\n]*\n){%s}" % 2)
+                getcpu = getcpu.gsub(Regexp.new("([^\n]*\n){%s}" % 2)
+                client.puts getcpu
                 client.puts MimicusAgent.getloadavg
     
                 if MimicusAgent.command?("free")
