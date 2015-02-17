@@ -137,7 +137,7 @@ end
                 client.puts "\"localtime\":\"#{Time.now}\","  
                 client.puts MimicusAgent.getcpustats
                 getcpu = MimicusAgent.getcpu
-                getcpu = next if getcpu <= 2
+                next if getcpu <= 2
                 client.puts getcpu
                 client.puts MimicusAgent.getloadavg
     
