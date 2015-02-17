@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'sysinfo'
   spec.add_dependency 'vmstat'
   spec.add_dependency 'process'
-  spec.add_dependency 'usagewatch'
+  #spec.add_dependency 'usagewatch'
   spec.add_dependency 'rest_client'
 
   #spec.add_dependency 'yaml'

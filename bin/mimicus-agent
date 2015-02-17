@@ -125,7 +125,7 @@ end
 
             loop do
             client = srv.accept
-            puts "Accepted connection from me"
+            puts "Fetch data ..."
 
 #Thread.new do
 #     begin
@@ -137,14 +137,8 @@ end
                 client.puts "\"localtime\":\"#{Time.now}\","  
                 client.puts MimicusAgent.getcpustats
                 getcpu = MimicusAgent.getcpu
-                #for line in getcpu
-                #    line = line.gsub("=","\":\"") 
-                #    line = line.gsub(", ","\", \"") 
-                #    line = line.gsub("{\\","{") 
-                #    line = line + "\"},"  
-                #    client.puts line
-                    client.puts getcpu
-                #end
+                getcpu = getcpu.gsub /^(?:[^\n]*\n){2}/, ''
+                client.puts getcpu
                 client.puts MimicusAgent.getloadavg
     
                 if MimicusAgent.command?("free")
